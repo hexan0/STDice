@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>オリジナルサイコロゲーム</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin-top: 1rem;
+    }
+    .dice-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 2rem;
+      margin: 2rem;
+      perspective: 1000px;
+    }
+    .dice-3d {
+      width: 80px;
+      height: 80px;
+      position: relative;
+      transform-style: preserve-3d;
+      transform: rotateX(0deg) rotateY(0deg);
+      transition: transform 1.2s ease-in-out;
+    }
+    .dice-face {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border: 2px solid #333;
+      color: #fff;
+      border-radius: 8px;
+      backface-visibility: hidden;
+      background: #ccc;
+      text-align: center;
+      padding: 5px;
+    }
+    .front  { transform: rotateY(   0deg) translateZ(40px); }
+    .back   { transform: rotateY( 180deg) translateZ(40px); }
+    .right  { transform: rotateY(  90deg) translateZ(40px); }
+    .left   { transform: rotateY( -90deg) translateZ(40px); }
+    .top    { transform: rotateX(  90deg) translateZ(40px); }
+    .bottom { transform: rotateX( -90deg) translateZ(40px); }
+
+    .green  { background-color: #2ecc71; }
+    .red    { background-color: #e74c3c; }
+    .blue   { background-color: #3498db; }
+    .white  { background-color: #ecf0f1; color: #000; }
+    .orange { background-color: #f39c12; }
+    .purple { background-color: #9b59b6; }
+
+    .roll-button {
+      padding: 0.75rem 2rem;
+      font-size: 1.2rem;
+      background: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      margin: 1rem;
+      cursor: pointer;
+    }
+
+    #resultText, #extraResultText {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>サイコロゲーム</h1>
+  <button class="roll-button" onclick="rollFirstDice()">サイコロを振る</button>
+  <div id="resultText"></div>
+  <div class="dice-container" id="diceContainer"></div>
+
+  <div id="nextRollArea" style="display: none;">
+    <button class="roll-button" onclick="rollSecondDice()">次のサイコロを振る</button>
+    <div id="extraResultText"></div>
+  </div>
+
+  <script>
+    const diceConfigFirst = {
+      dice1: [
+        { text: 'N', class: 'green' },
+        { text: 'T', class: 'red' },
+        { text: 'H', class: 'blue' }
+      ],
+      dice2: Array.from({ length: 19 }, (_, i) => ({
+        text: (i + 1).toString(),
+        class: 'white'
+      }))
+    };
+
+    const diceConfigSecond = {
+      dice1: [
+        { text: '自由行動', class: 'orange' },
+        { text: '選択行動', class: 'orange' },
+        { text: '駅名', class: 'orange' },
+        { text: '公園', class: 'orange' },
+        { text: '絶景絶品検討', class: 'orange' },
+        { text: '新発見', class: 'orange' }
+      ],
+      dice2: [
+        { text: 'なし', class: 'purple' },
+        { text: '電動禁止', class: 'purple' },
+        { text: '右折禁止', class: 'purple' },
+        { text: '日本語禁止', class: 'purple' },
+        { text: '外来語禁止', class: 'purple' },
+        { text: 'スマホ禁止', class: 'purple' }
+      ]
+    };
+
+    const stationMap = {
+      N: ['麻生', '北34条', '北24条', '北18条', '北12条', 'さっぽろ', '大通', 'すすきの', '中島公園', '幌平橋', '中の島', '平岸', '南平岸', '澄川', '自衛隊前', '真駒内'],
+      T: ['宮の沢', '発寒南', '琴似', '二十四軒', '西28丁目', '円山公園', '西18丁目', '西11丁目', '大通', 'バスセンター前', '菊水', '東札幌', '白石', '南郷7丁目', '南郷13丁目', '南郷18丁目', '大谷地', 'ひばりが丘', '新さっぽろ'],
+      H: ['栄町', '新道東', '元町', '環状通東', '東区役所前', '北13条東', 'さっぽろ', '大通', '豊水すすきの', '学園前', '豊平公園', '美園', '月寒中央', '福住']
+    };
+
+    function createEmptyDice() {
+      const cube = document.createElement('div');
+      cube.className = 'dice-3d temp-dice'; // ← 追加: アニメ用には "temp-dice" を付与
+      const faceNames = ['front', 'back', 'right', 'left', 'top', 'bottom'];
+      for (let faceName of faceNames) {
+        const face = document.createElement('div');
+        face.className = `dice-face ${faceName}`;
+        cube.appendChild(face);
+      }
+      return cube;
+    }
+
+    function createResultDice(faceData) {
+      const cube = document.createElement('div');
+      cube.className = 'dice-3d';
+      const faceNames = ['front', 'back', 'right', 'left', 'top', 'bottom'];
+      for (let faceName of faceNames) {
+        const face = document.createElement('div');
+        face.className = `dice-face ${faceName} ${faceData.class}`;
+        face.textContent = faceData.text;
+        cube.appendChild(face);
+      }
+      return cube;
+    }
+
+    function rollDice(faces) {
+      const index = Math.floor(Math.random() * faces.length);
+      return faces[index];
+    }
+
+    function getRandomRotation() {
+      const x = 360 * (3 + Math.floor(Math.random() * 3));
+      const y = 360 * (3 + Math.floor(Math.random() * 3));
+      const directionX = Math.random() < 0.5 ? 1 : -1;
+      const directionY = Math.random() < 0.5 ? 1 : -1;
+      return { x: x * directionX, y: y * directionY };
+    }
+
+    function clearTempDice() {
+      document.querySelectorAll('.temp-dice').forEach(dice => dice.remove());
+    }
+
+    function rollFirstDice() {
+      const container = document.getElementById('diceContainer');
+      const resultText = document.getElementById('resultText');
+      container.innerHTML = '';
+      resultText.textContent = '';
+      document.getElementById('nextRollArea').style.display = 'none';
+
+      const emptyDice1 = createEmptyDice();
+      const emptyDice2 = createEmptyDice();
+      container.appendChild(emptyDice1);
+      container.appendChild(emptyDice2);
+
+      const rotation1 = getRandomRotation();
+      const rotation2 = getRandomRotation();
+
+      requestAnimationFrame(() => {
+        emptyDice1.style.transform = `rotateX(${rotation1.x}deg) rotateY(${rotation1.y}deg)`;
+        emptyDice2.style.transform = `rotateX(${rotation2.x}deg) rotateY(${rotation2.y}deg)`;
+      });
+
+      setTimeout(() => {
+        clearTempDice(); // ← ここでグレーのサイコロを消す！
+
+        const result1 = rollDice(diceConfigFirst.dice1);
+        const result2 = rollDice(diceConfigFirst.dice2);
+        const dice1 = createResultDice(result1);
+        const dice2 = createResultDice(result2);
+        container.appendChild(dice1);
+        container.appendChild(dice2);
+
+        const line = result1.text;
+        const index = parseInt(result2.text) - 1;
+        const stationList = stationMap[line];
+        const station = stationList?.[index] ?? '（該当なし）';
+
+        resultText.textContent = `結果：${line}${result2.text} → 「${station}」駅`;
+
+        document.getElementById('nextRollArea').style.display = 'block';
+      }, 1200);
+    }
+
+    function rollSecondDice() {
+      const container = document.getElementById('diceContainer');
+      const extraResultText = document.getElementById('extraResultText');
+
+      const emptyDice1 = createEmptyDice();
+      const emptyDice2 = createEmptyDice();
+      container.appendChild(emptyDice1);
+      container.appendChild(emptyDice2);
+
+      const rotation1 = getRandomRotation();
+      const rotation2 = getRandomRotation();
+
+      requestAnimationFrame(() => {
+        emptyDice1.style.transform = `rotateX(${rotation1.x}deg) rotateY(${rotation1.y}deg)`;
+        emptyDice2.style.transform = `rotateX(${rotation2.x}deg) rotateY(${rotation2.y}deg)`;
+      });
+
+      setTimeout(() => {
+        clearTempDice(); // ← ここでもグレーのサイコロを消す！
+
+        const result1 = rollDice(diceConfigSecond.dice1);
+        const result2 = rollDice(diceConfigSecond.dice2);
+        const dice1 = createResultDice(result1);
+        const dice2 = createResultDice(result2);
+        container.appendChild(dice1);
+        container.appendChild(dice2);
+
+        extraResultText.textContent = `行動: ${result1.text}　禁止ルール: ${result2.text}`;
+      }, 1200);
+    }
+  </script>
+</body>
+</html>

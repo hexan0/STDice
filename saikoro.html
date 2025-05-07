@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>オリジナルサイコロ</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin-top: 1rem;
+    }
+    .dice-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 2rem;
+      margin: 1rem;
+      perspective: 1000px;
+    }
+    .dice-3d {
+      width: 64px;
+      height: 64px;
+      position: relative;
+      transform-style: preserve-3d;
+      transform: rotateX(0deg) rotateY(0deg);
+      animation: rollCube 1s ease-in-out;
+    }
+    .dice-face {
+      position: absolute;
+      width: 64px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      font-weight: bold;
+      border: 2px solid #333;
+      color: #fff;
+      border-radius: 8px;
+      backface-visibility: hidden;
+    }
+    .front  { transform: rotateY(   0deg) translateZ(32px); }
+    .back   { transform: rotateY( 180deg) translateZ(32px); }
+    .right  { transform: rotateY(  90deg) translateZ(32px); }
+    .left   { transform: rotateY( -90deg) translateZ(32px); }
+    .top    { transform: rotateX(  90deg) translateZ(32px); }
+    .bottom { transform: rotateX( -90deg) translateZ(32px); }
+
+    @keyframes rollCube {
+      0%   { transform: rotateX(0deg) rotateY(0deg); }
+      100% { transform: rotateX(720deg) rotateY(720deg); }
+    }
+
+    .green  { background-color: #2ecc71; }
+    .red    { background-color: #e74c3c; }
+    .blue   { background-color: #3498db; }
+    .black  { background-color: #2c3e50; }
+    .white  { background-color: #ecf0f1; color: #000; }
+    .pink   { background-color: #f78ecf; }
+
+    .roll-button {
+      padding: 0.75rem 2rem;
+      font-size: 1.2rem;
+      background: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>サイコロゲーム</h1>
+  <button class="roll-button" onclick="rollAllDice()">サイコロを振る</button>
+  <div class="dice-container" id="diceContainer"></div>
+
+  <script>
+    const diceConfig = {
+      base: [
+        { name: '線決定', faces: [
+          { text: 'N', class: 'green' },
+          { text: 'T', class: 'red' },
+          { text: 'H', class: 'blue' }
+        ]},
+        { name: '十の位', faces: [
+          { text: '0', class: 'black' },
+          { text: '1', class: 'black' }
+        ]},
+        { name: '一の位', faces: [
+          { text: '0', class: 'white' },
+          { text: '1', class: 'white' },
+          { text: '2', class: 'white' },
+          { text: '3', class: 'white' },
+          { text: '4', class: 'white' },
+          { text: '5', class: 'white' }
+        ]},
+        { name: '一の位+', faces: [
+          { text: '+0', class: 'red' },
+          { text: '+1', class: 'red' },
+          { text: '+2', class: 'red' },
+          { text: '+3', class: 'red' },
+          { text: '+4', class: 'red' }
+        ]},
+        { name: '行動決定', faces: [
+          { text: 'セーフ', class: 'pink' },
+          { text: '強制', class: 'pink' },
+          { text: '強制', class: 'pink' },
+          { text: '禁止', class: 'pink' },
+          { text: '禁止', class: 'pink' },
+          { text: '両方', class: 'pink' }
+        ]}
+      ],
+      force: [
+        { text: '公園へGO', class: 'red' },
+        { text: '駅弁を探せ', class: 'red' },
+        { text: 'Must飲酒', class: 'red' }
+      ],
+      ban: [
+        { text: '禁煙', class: 'black' },
+        { text: 'スマホ禁止', class: 'black' },
+        { text: 'メガネ禁止', class: 'black' }
+      ]
+    };
+
+    function create3DDice(faceText, faceClass) {
+      const cube = document.createElement('div');
+      cube.className = 'dice-3d';
+
+      const facePositions = ['front', 'back', 'right', 'left', 'top', 'bottom'];
+      const texts = [
+        faceText, faceText, faceText,
+        faceText, faceText, faceText
+      ];
+
+      facePositions.forEach((pos, i) => {
+        const face = document.createElement('div');
+        face.className = `dice-face ${pos} ${faceClass}`;
+        face.textContent = texts[i];
+        cube.appendChild(face);
+      });
+
+      return cube;
+    }
+
+    function rollDice(faces) {
+      const index = Math.floor(Math.random() * faces.length);
+      return faces[index];
+    }
+
+    function rollAllDice() {
+      const container = document.getElementById('diceContainer');
+      container.innerHTML = '';
+
+      const results = [];
+      diceConfig.base.forEach(die => {
+        const face = rollDice(die.faces);
+        results.push({ type: die.name, face });
+        const cube = create3DDice(face.text, face.class);
+        container.appendChild(cube);
+      });
+
+      const actionResult = results.find(r => r.type === '行動決定').face.text;
+      if (actionResult.includes('強制') || actionResult.includes('両方')) {
+        const face = rollDice(diceConfig.force);
+        const cube = create3DDice(face.text, face.class);
+        container.appendChild(cube);
+      }
+      if (actionResult.includes('禁止') || actionResult.includes('両方')) {
+        const face = rollDice(diceConfig.ban);
+        const cube = create3DDice(face.text, face.class);
+        container.appendChild(cube);
+      }
+    }
+  </script>
+</body>
+</html>
